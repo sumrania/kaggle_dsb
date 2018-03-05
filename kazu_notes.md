@@ -1,29 +1,47 @@
+Google collab folder with notebooks: https://drive.google.com/open?id=184SCoxmH8RFsYquz0o43MYfwrCx9o2vm
+
+* see `keras_unet_kernel` and `unet_with_deformation`
+
 ### To-do
 
-* Read papers (Densenet), blog posts
+##### Preprocessing
 
-* U-net tests (set up jupyter notebooks on aws)
-    * confirm implementation - short tests
-    * Should padding be valid? or same? 
-    * Add batchnorm - conv, batchnorm, relu for each conv
-        * Replace dropout? test with/without
-        * https://tuatini.me/practical-image-segmentation-with-unet/
+* Write function to add weights for overlapping/touching cells
+* try centering and normalization (feature-wise)
+ * https://www.kaggle.com/hexietufts/easy-to-use-keras-imagedatagenerator
 
-* convert data augmentation into generator
-    * normalize to [-1, 1], resize, elastic deformation
-    * https://www.kaggle.com/hexietufts/easy-to-use-keras-imagedatagenerator
-    * keras imagedatagenerator mask
-    * make sure to normalize images to [-1, 1]
+* Elastic deformation
+    * ImageDataGenerator makes it easy to do standard data augmentation/pre-processing, but not easy to do an elastic deformation (with same random seed) for both an image and its label. Solution: make CustomImageDataGenerator contain ImageDataGenerator? or superclass? 
+    * figure out what necessary interfaces are for ImageDataGenerator with elastic deformation
 
-* Run U-net with/without data augmentation
-    * save models, compare performance
+* Figure out how to implement weights and separations for cell borders
+    * Want segmentation mask to have background pixels at borders
+    * Weights of 1 to 10: 1 for normal , 5 for close ones, 10 for background pixels that were added
+    * `ndimage.binary_opening`? like https://www.kaggle.com/stkbailey/teaching-notebook-for-total-imaging-newbies
+    * `cv2.findContours`
+
+* Get contours (for DCAN)
+
+##### Testing
+
+* Test U-net with elastic deformation data augmentation
+
+* Add batchnorm:
+    * Replace dropout? test with/without
+    * batchnorm: conv->relu->batchnorm->dropout
+    * https://tuatini.me/practical-image-segmentation-with-unet/
+
+* Should padding be valid? or same? In paper I think it's valid - but then this adds added complexity of 
+* Identify failure cases - high validation loss
+    * Color clusters by label number
+
+##### Misc
+
+* Organize work so far in single notebook
+* understand run length encoding, evaluation metric
 
 ---
 
-* Try in pytorch?  
-    * Go thru tutorials and run on mnist first
-
-* Figure out how to implement weights and separations
 * Implement learning rate finder, cyclic learning rate for keras
 
 ### Pre-processing
@@ -65,6 +83,7 @@ What is the set of semantically correct augmentations that we can apply to micro
 * train/val split, cross validation method
 * standard function for evaluating models? Model class that has predict() function, with whatever else it needs to do to load weights. Evaluator will use test set to compute goodness metrics. Can we periodically rotate out a new testing/validation set from our training data? Having all data on repo would be great for this 
 
+* https://github.com/matterport/Mask_RCNN
 * larger images perform better in medical imaging
 * in the last 12 months NasNets have shown significant improvement (50%) over older models
 * The more classes you train the model on properly, the better results you can expect. (auxiliary tasks?)
@@ -76,7 +95,6 @@ What is the set of semantically correct augmentations that we can apply to micro
 * what should our model look for? How big of a receptive field does it need for that?
 * fast.ai: data reading/augmentation, NN training tricks
 * scikit-learn: standard data analysis algorithms
-* Read papers from Jiahong
 * https://www.kaggle.com/c/data-science-bowl-2018/discussion/48130
 * Kernels are a good starting point. From there, we’ll have to look closer at models/papers to understand pros/cons, understand the data, etc.
 * read about xgboost
@@ -87,6 +105,13 @@ What is the set of semantically correct augmentations that we can apply to micro
     * DCAN separates the network into two heads at the output (multi-task learning): segmentation and contour probabilities, and has separate mask labels for each head. These are then fused at the end for final segmentation. This is a much more explicit way of dealing with objects in contact
 
 * In DCAN, what are the "auxiliary tasks that encourage gradient flow"?
+
+##### Traditional CV methods
+
+Most kernels demonstrating solutions using traditional methods did something like the following pipeline: 
+
+* Threshold image with Otsu method (assume pixel values are distributed in bimodal distribution, find threshold in middle of the two peaks)
+* Dilate/erode image to get rid of noise and separate touching components
 
 ### References
 
