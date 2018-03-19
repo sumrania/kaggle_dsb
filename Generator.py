@@ -6,18 +6,22 @@ from __future__ import absolute_import
 from __future__ import print_function
 
 import numpy as np
+import cv2
 import re
 from scipy import linalg
 import scipy.ndimage as ndi
+from scipy.ndimage.interpolation import map_coordinates
+from scipy.ndimage.filters import gaussian_filter
 from six.moves import range
 import os
 import threading
 import warnings
 import multiprocessing.pool
 from functools import partial
+import matplotlib.pyplot as plt
 
-from .. import backend as K
-from ..utils.data_utils import Sequence
+from keras import backend as K
+from keras.utils.data_utils import Sequence
 
 try:
     from PIL import Image as pil_image
@@ -367,6 +371,8 @@ def load_img(path, grayscale=False, target_size=None,
 def rgb2gray(img):
     r, g, b = img[:,:,0], img[:,:,1], img[:,:,2]
     gray = 0.2989 * r + 0.5870 * g + 0.1140 * b
+    h, w = gray.shape[0], gray.shape[1]
+    gray = np.reshape(gray, (h, w, 1))
     return gray
 
 def list_pictures(directory, ext='jpg|jpeg|bmp|png|ppm'):
@@ -436,6 +442,7 @@ class SegDataGenerator(object):
                  rescale=None,
                  preprocessing_function=None,
                  data_format=None,
+                 rotation_right=True,
                  elastic_transform=False,
                  elastic_alpha=512,
                  elastic_sigma=20.48,
@@ -462,7 +469,8 @@ class SegDataGenerator(object):
         self.rescale = rescale
         self.preprocessing_function = preprocessing_function
         
-        self.elastic_transform = elastic_transform
+        self.rotation_right = rotation_right
+        self.elastic = elastic_transform
         self.elastic_alpha = elastic_alpha
         self.elastic_sigma = elastic_sigma
         self.elastic_alpha_affine = elastic_alpha_affine
@@ -519,7 +527,8 @@ class SegDataGenerator(object):
                             save_prefix='',
                             save_format='png',
                             follow_links=False,
-                            use_contour=True):
+                            use_contour=True,
+                            label_bw=False):
         return DirectoryIterator(
             directory, self, subset=subset,
             target_size=target_size, color_mode=color_mode,
@@ -530,7 +539,7 @@ class SegDataGenerator(object):
             save_prefix=save_prefix,
             save_format=save_format,
             follow_links=follow_links,
-            use_contour=use_contour)
+            use_contour=use_contour, label_bw=label_bw)
 
     def standardize(self, x):
         """Apply the normalization configuration to a batch of inputs.
@@ -610,18 +619,19 @@ class SegDataGenerator(object):
         dx_i, dy_i, dz_i = tile3(dx, channels), tile3(dy, channels), tile3(dz, channels)
         
         x, y, z = np.meshgrid(np.arange(shape[1]), np.arange(shape[0]), np.arange(shape[2]))
-        indices = np.array([np.reshape(y+dy_i, (-1, 1)), np.reshape(x+dx_i, (-1, 1)), np.reshape(z, (-1, 1))])
+        indices = np.array([np.reshape(y+dy_i, (-1, 1)), np.reshape(x+dx_i, (-1, 1)), 
+                            np.reshape(z, (-1, 1))])
                 
         original_dtype = img.dtype
         img = img.astype(np.uint8)
         img = cv2.warpAffine(img, M, img_size[::-1], borderMode=cv2.BORDER_REFLECT_101).reshape(shape)
         img_distorted = map_coordinates(input=img, coordinates=indices, order=1, mode='reflect')
         img_distorted = img_distorted.astype(original_dtype).reshape(shape)
-        images_distorted.append(img_distorted)
+        
+        return img_distorted
 
 
-    
-    def random_transform(self, img, res, seed=None):
+    def random_transform(self, x, seed=None):
         """Randomly augment a single image tensor.
 
         # Arguments
@@ -631,9 +641,6 @@ class SegDataGenerator(object):
         # Returns
             A randomly transformed version of the input (same shape).
         """
-        x = np.concatenate((img, res), axis=2)
-        print("get into random transform")
-        print(x.shape)
         
         # x is a single image, so it doesn't have image number at index 0
         img_row_axis = self.row_axis - 1
@@ -649,16 +656,28 @@ class SegDataGenerator(object):
             theta = np.pi / 180 * np.random.uniform(-self.rotation_range, self.rotation_range)
         else:
             theta = 0
+        
+        if self.rotation_right:
+            thetas = [0, 90, 180, 270]
+            theta = thetas[int(4*np.random.rand())]
+        else:
+            theta = 0
+        print("theta")
+        print(theta)
 
         if self.height_shift_range:
             tx = np.random.uniform(-self.height_shift_range, self.height_shift_range) * x.shape[img_row_axis]
         else:
             tx = 0
+        print("height_shift_range")
+        print(tx)
 
         if self.width_shift_range:
             ty = np.random.uniform(-self.width_shift_range, self.width_shift_range) * x.shape[img_col_axis]
         else:
             ty = 0
+        print("width_shift_range")
+        print(ty)
 
         if self.shear_range:
             shear = np.random.uniform(-self.shear_range, self.shear_range)
@@ -669,6 +688,9 @@ class SegDataGenerator(object):
             zx, zy = 1, 1
         else:
             zx, zy = np.random.uniform(self.zoom_range[0], self.zoom_range[1], 2)
+        print("zoom")
+        print(zx)
+        print(zy)
 
         transform_matrix = None
         if theta != 0:
@@ -713,7 +735,8 @@ class SegDataGenerator(object):
             if np.random.random() < 0.5:
                 x = flip_axis(x, img_row_axis)
         
-        if elastic_transform:
+        if self.elastic:
+            x = self.elastic_transform(x)      
             
         return x
 
@@ -1062,13 +1085,13 @@ class DirectoryIterator(Iterator):
         subset: 'training' or 'validation'or 'testing'
     """
 
-    def __init__(self, directory, image_data_generator,
+    def __init__(self, directory, image_data_generator, 
                  target_size=(256, 256), color_mode='rgb',
                  classes=None, class_mode='categorical',
                  batch_size=32, shuffle=True, seed=None,
-                 data_format=None,
+                 data_format=None, subset='training',
                  save_to_dir=None, save_prefix='', save_format='png',
-                 follow_links=False, use_contour=True):
+                 follow_links=False, use_contour=True, label_bw=False):
         if data_format is None:
             data_format = K.image_data_format()
         self.directory = directory
@@ -1091,7 +1114,7 @@ class DirectoryIterator(Iterator):
                 self.image_shape = (1,) + self.target_size
         self.classes = classes
         if class_mode not in {'categorical', 'binary', 'sparse',
-                              'input', 'seg', None}:
+                              'input', 'segmentation', None}:
             raise ValueError('Invalid class_mode:', class_mode,
                              '; expected one of "categorical", '
                              '"binary", "sparse", "input", "segmentation"'
@@ -1101,11 +1124,12 @@ class DirectoryIterator(Iterator):
         self.save_prefix = save_prefix
         self.save_format = save_format
         
-        if subset != 'validation' or 'training' or 'testing':
+        if subset not in{'validation', 'training', 'testing'}:
             raise ValueError('Invalid subset name: ', subset,
                                  '; expected "training" or "validation" or "testing"')
         self.subset = subset
         self.use_contour = use_contour
+        self.label_bw = label_bw
         
 
         white_list_formats = {'png', 'jpg', 'jpeg', 'bmp', 'ppm'}
@@ -1120,7 +1144,7 @@ class DirectoryIterator(Iterator):
         self.samples = 0
         if os.path.isfile(self.directory):
             print('Reading from previously loaded data.')
-            npzfile = np.load(save_path)
+            npzfile = np.load(self.directory)
         else:
             raise ValueError('Invalid data path: ', self.directory)
         
@@ -1148,7 +1172,18 @@ class DirectoryIterator(Iterator):
         else:
             self.images = npzfile['X_test']
             self.samples = len(self.images)
-
+        
+        if self.label_bw == True:
+            labels_new = np.zeros(self.labels.shape)
+            idx = self.labels > 128
+            labels_new[idx] = 255
+            self.labels = labels_new
+            if self.use_contour == True:
+                contours_new = np.zeros(self.contours.shape)
+                idx = self.contours > 128
+                contours_new[idx] = 255
+                self.contours = contours_new
+        
         print('Found %d images belonging to %d classes.' % (self.samples, self.num_class))
         
         super(DirectoryIterator, self).__init__(self.samples, batch_size, shuffle, seed)
@@ -1157,55 +1192,71 @@ class DirectoryIterator(Iterator):
         print("get into get batches")
         batch_x = np.zeros((len(index_array),) + self.image_shape, dtype=K.floatx())
         batch_s = np.zeros((len(index_array),) + self.image_shape, dtype=K.floatx())
+        h, w = self.image_shape[0], self.image_shape[1]    
+        grayscale = self.color_mode == 'grayscale'
+        
         if self.use_contour == True:
             batch_c = np.zeros((len(index_array),) + self.image_shape, dtype=K.floatx())
-            
-        grayscale = self.color_mode == 'grayscale'
-        # build batch of image data
-        for i, j in enumerate(index_array):
-            img = self.images[j]
-            label = self.labels[j]
-            if self.use_contour == True:
-                contour = self.contours[j]
-#                 print(contour.shape)  #(256,256,1)
-                res = np.concatenate((label, contour), axis=2)
-            else:
-                res = label
-            
-            # grayscale
-            if grayscale == True and img.shape[2] != 1:
-                img = rgb2gray(img)
-                print("convert to grayscale")
-            img, res = self.image_data_generator.random_transform(img, res)
-            
-           
-            x = self.image_data_generator.standardize(x)
-            
-            batch_x[i] = img
-            batch_y[i] = label
-        # optionally save augmented images to disk for debugging purposes
-        if self.save_to_dir:
             for i, j in enumerate(index_array):
-                img = array_to_img(batch_x[i], self.data_format, scale=True)
-                fname = '{prefix}_{index}_{hash}.{format}'.format(prefix=self.save_prefix,
-                                                                  index=j,
-                                                                  hash=np.random.randint(1e4),
-                                                                  format=self.save_format)
-                img.save(os.path.join(self.save_to_dir, fname))
-        # build batch of labels
-        if self.class_mode == 'input':
-            batch_y = batch_x.copy()
-        elif self.class_mode == 'sparse':
-            batch_y = self.classes[index_array]
-        elif self.class_mode == 'binary':
-            batch_y = self.classes[index_array].astype(K.floatx())
-        elif self.class_mode == 'categorical':
-            batch_y = np.zeros((len(batch_x), self.num_class), dtype=K.floatx())
-            for i, label in enumerate(self.classes[index_array]):
-                batch_y[i, label] = 1.
-        else:
-            return batch_x
-        return batch_x, batch_y
+                img = self.images[j]
+                label = self.labels[j]
+                contour = self.contours[j]
+                res = np.concatenate((label, contour), axis=2)
+                # grayscale
+                if grayscale == True and img.shape[2] != 1:
+                    img = rgb2gray(img)
+                x = np.concatenate((img, res), axis=2)
+                print("get into random transform")
+                x = self.image_data_generator.random_transform(x)
+                if grayscale == True:
+                    img = np.reshape(x[:,:,0], (h, w, 1))
+                    res = x[:,:,1:]
+                else:
+                    img = x[:,:,0:3]
+                    res = x[:,:,4:]
+                
+                img = self.image_data_generator.standardize(img)
+                res = res / 255.0
+                batch_x[i] = img
+                batch_s[i] = np.reshape(res[:,:,0], (h, w, 1))
+                batch_c[i] = np.reshape(res[:,:,1], (h, w, 1))
+            return batch_x, batch_s, batch_c
+        # no contour
+        else: 
+            for i, j in enumerate(index_array):
+                img = self.images[j]
+                plt.imshow(np.squeeze(img), cmap='gray')
+                label = self.labels[j]
+                res = label
+                # grayscale
+                if grayscale == True and img.shape[2] != 1:
+                    img = rgb2gray(img)
+                x = np.concatenate((img, res), axis=2)
+                print("get into random transform")
+                x = self.image_data_generator.random_transform(x)
+                if grayscale == True:
+                    img = np.reshape(x[:,:,0], (h, w, 1))
+                    res = np.reshape(x[:,:,1], (h, w, 1))
+                else:
+                    img = x[:,:,0:3]
+                    res = np.reshape(x[:,:,4], (h, w, 1))
+                
+                img = self.image_data_generator.standardize(img)
+                res = res / 255.0
+                batch_x[i] = img
+                batch_s[i] = res    
+            return batch_x, batch_s    
+                
+        # optionally save augmented images to disk for debugging purposes
+#         if self.save_to_dir:
+#             for i, j in enumerate(index_array):
+#                 img = array_to_img(batch_x[i], self.data_format, scale=True)
+#                 fname = '{prefix}_{index}_{hash}.{format}'.format(prefix=self.save_prefix,
+#                                                                   index=j,
+#                                                                   hash=np.random.randint(1e4),
+#                                                                   format=self.save_format)
+#                 img.save(os.path.join(self.save_to_dir, fname))
+
 
     def next(self):
         """For python 2.x.
@@ -1217,4 +1268,5 @@ class DirectoryIterator(Iterator):
             index_array = next(self.index_generator)
         # The transformation of images is not under thread lock
         # so it can be done in parallel
+        print(index_array)
         return self._get_batches_of_transformed_samples(index_array)
