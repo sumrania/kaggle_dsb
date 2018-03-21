@@ -662,22 +662,22 @@ class SegDataGenerator(object):
             theta = thetas[int(4*np.random.rand())]
         else:
             theta = 0
-        print("theta")
-        print(theta)
+#         print("theta")
+#         print(theta)
 
         if self.height_shift_range:
             tx = np.random.uniform(-self.height_shift_range, self.height_shift_range) * x.shape[img_row_axis]
         else:
             tx = 0
-        print("height_shift_range")
-        print(tx)
+#         print("height_shift_range")
+#         print(tx)
 
         if self.width_shift_range:
             ty = np.random.uniform(-self.width_shift_range, self.width_shift_range) * x.shape[img_col_axis]
         else:
             ty = 0
-        print("width_shift_range")
-        print(ty)
+#         print("width_shift_range")
+#         print(ty)
 
         if self.shear_range:
             shear = np.random.uniform(-self.shear_range, self.shear_range)
@@ -688,9 +688,9 @@ class SegDataGenerator(object):
             zx, zy = 1, 1
         else:
             zx, zy = np.random.uniform(self.zoom_range[0], self.zoom_range[1], 2)
-        print("zoom")
-        print(zx)
-        print(zy)
+#         print("zoom")
+#         print(zx)
+#         print(zy)
 
         transform_matrix = None
         if theta != 0:
@@ -1189,7 +1189,7 @@ class DirectoryIterator(Iterator):
         super(DirectoryIterator, self).__init__(self.samples, batch_size, shuffle, seed)
 
     def _get_batches_of_transformed_samples(self, index_array):
-        print("get into get batches")
+#         print("get into get batches")
         batch_x = np.zeros((len(index_array),) + self.image_shape, dtype=K.floatx())
         batch_s = np.zeros((len(index_array),) + self.image_shape, dtype=K.floatx())
         h, w = self.image_shape[0], self.image_shape[1]    
@@ -1206,7 +1206,7 @@ class DirectoryIterator(Iterator):
                 if grayscale == True and img.shape[2] != 1:
                     img = rgb2gray(img)
                 x = np.concatenate((img, res), axis=2)
-                print("get into random transform")
+#                 print("get into random transform")
                 x = self.image_data_generator.random_transform(x)
                 if grayscale == True:
                     img = np.reshape(x[:,:,0], (h, w, 1))
@@ -1220,7 +1220,7 @@ class DirectoryIterator(Iterator):
                 batch_x[i] = img
                 batch_s[i] = np.reshape(res[:,:,0], (h, w, 1))
                 batch_c[i] = np.reshape(res[:,:,1], (h, w, 1))
-            return batch_x, batch_s, batch_c
+            return batch_x, {'segmentation': batch_s, 'contour': batch_c}
         # no contour
         else: 
             for i, j in enumerate(index_array):
@@ -1232,7 +1232,7 @@ class DirectoryIterator(Iterator):
                 if grayscale == True and img.shape[2] != 1:
                     img = rgb2gray(img)
                 x = np.concatenate((img, res), axis=2)
-                print("get into random transform")
+#                 print("get into random transform")
                 x = self.image_data_generator.random_transform(x)
                 if grayscale == True:
                     img = np.reshape(x[:,:,0], (h, w, 1))
