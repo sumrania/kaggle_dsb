@@ -527,7 +527,8 @@ class SegDataGenerator(object):
                             save_prefix='',
                             save_format='png',
                             follow_links=False,
-                            use_contour=True,
+                            use_contour=False,
+                            use_weights=False,
                             label_bw=False):
         return DirectoryIterator(
             directory, self, subset=subset,
@@ -539,7 +540,9 @@ class SegDataGenerator(object):
             save_prefix=save_prefix,
             save_format=save_format,
             follow_links=follow_links,
-            use_contour=use_contour, label_bw=label_bw)
+            use_contour=use_contour, 
+            use_weights=use_weights,
+            label_bw=label_bw)
 
     def standardize(self, x):
         """Apply the normalization configuration to a batch of inputs.
@@ -1091,7 +1094,8 @@ class DirectoryIterator(Iterator):
                  batch_size=32, shuffle=True, seed=None,
                  data_format=None, subset='training',
                  save_to_dir=None, save_prefix='', save_format='png',
-                 follow_links=False, use_contour=True, label_bw=False):
+                 follow_links=False, use_contour=False, 
+                 use_weights=False, label_bw=False):
         if data_format is None:
             data_format = K.image_data_format()
         self.directory = directory
@@ -1129,6 +1133,7 @@ class DirectoryIterator(Iterator):
                                  '; expected "training" or "validation" or "testing"')
         self.subset = subset
         self.use_contour = use_contour
+        self.use_weights = use_weights
         self.label_bw = label_bw
         
 
@@ -1158,6 +1163,9 @@ class DirectoryIterator(Iterator):
             if self.use_contour == True:
                 contours = npzfile['C_train']
                 self.contours = contours[0:int((1-validation_split)*num_images-1)]
+            if self.use_weights == True:
+                weights = npzfile['W_train']
+                self.weights = weights[0:int((1-validation_split)*num_images-1)]
             self.samples = len(self.images)
         elif self.subset == 'validation':
             images = npzfile['X_train']
@@ -1168,6 +1176,9 @@ class DirectoryIterator(Iterator):
             if self.use_contour == True:
                 contours = npzfile['C_train']
                 self.contours = contours[int((1-validation_split)*num_images):]
+            if self.use_weights:
+                weights = npzfile['W_train']
+                self.weights = weights[int((1-validation_split)*num_images):]
             self.samples = len(self.images)
         else:
             self.images = npzfile['X_test']
@@ -1183,6 +1194,11 @@ class DirectoryIterator(Iterator):
                 idx = self.contours > 128
                 contours_new[idx] = 255
                 self.contours = contours_new
+            # if self.use_weights:
+            #     contours_new = np.zeros(self.contours.shape)
+            #     idx = self.contours > 128
+            #     contours_new[idx] = 255
+            #     self.contours = contours_new
         
         print('Found %d images belonging to %d classes.' % (self.samples, self.num_class))
         
@@ -1196,7 +1212,7 @@ class DirectoryIterator(Iterator):
 
         h, w = self.image_shape[0], self.image_shape[1]    
         grayscale = self.color_mode == 'grayscale'
-        
+
         if self.use_contour == True:
             batch_c = np.zeros((len(index_array),) + self.image_shape, dtype=K.floatx())
             for i, j in enumerate(index_array):
@@ -1215,7 +1231,7 @@ class DirectoryIterator(Iterator):
                     res = x[:,:,1:]
                 else:
                     img = x[:,:,0:3]
-                    res = x[:,:,4:]
+                    res = x[:,:,3:]
                 
                 img = self.image_data_generator.standardize(img)
                 res = res / 255.0
@@ -1223,6 +1239,33 @@ class DirectoryIterator(Iterator):
                 batch_s[i] = np.reshape(res[:,:,0], (h, w, 1))
                 batch_c[i] = np.reshape(res[:,:,1], (h, w, 1))
             return batch_x, {'segmentation': batch_s, 'contour': batch_c}
+        elif self.use_weights:
+            batch_x = np.zeros((len(index_array),) + self.image_shape, dtype=K.floatx())
+            # labels have two layers: mask and weights
+            batch_s = np.zeros((len(index_array), self.image_shape[0], self.image_shape[1], 2), dtype=K.floatx())
+
+            for i, j in enumerate(index_array):
+                img = self.images[j]
+                label = self.labels[j]
+                weights = self.weights[j]
+                weights = np.expand_dims(weights, 3) # TODO deal with this in data preprocessor
+
+                if grayscale == True and img.shape[2] != 1:
+                    img = rgb2gray(img)
+                x = np.concatenate((img, label, weights), axis=2)
+                x = self.image_data_generator.random_transform(x)
+                if grayscale == True:
+                    img = np.reshape(x[:,:,0], (h, w, 1))
+                    res = np.reshape(x[:,:,1:], (h, w, 2))
+                else:
+                    img = x[:,:,0:3]
+                    res = np.reshape(x[:,:,3:], (h, w, 2))
+                
+                img = self.image_data_generator.standardize(img)
+                res = res / 255.0
+                batch_x[i] = img
+                batch_s[i] = res
+            return batch_x, batch_s
         # no contour
         else: 
             for i, j in enumerate(index_array):
