@@ -1191,7 +1191,9 @@ class DirectoryIterator(Iterator):
     def _get_batches_of_transformed_samples(self, index_array):
 #         print("get into get batches")
         batch_x = np.zeros((len(index_array),) + self.image_shape, dtype=K.floatx())
-        batch_s = np.zeros((len(index_array),) + self.image_shape, dtype=K.floatx())
+        # batch_s = np.zeros((len(index_array),) + self.image_shape, dtype=K.floatx())
+        batch_s = np.zeros((len(index_array), self.image_shape[0], self.image_shape[1], 1), dtype=K.floatx())
+
         h, w = self.image_shape[0], self.image_shape[1]    
         grayscale = self.color_mode == 'grayscale'
         
@@ -1225,7 +1227,7 @@ class DirectoryIterator(Iterator):
         else: 
             for i, j in enumerate(index_array):
                 img = self.images[j]
-                plt.imshow(np.squeeze(img), cmap='gray')
+                # plt.imshow(np.squeeze(img), cmap='gray')
                 label = self.labels[j]
                 res = label
                 # grayscale
@@ -1239,12 +1241,13 @@ class DirectoryIterator(Iterator):
                     res = np.reshape(x[:,:,1], (h, w, 1))
                 else:
                     img = x[:,:,0:3]
-                    res = np.reshape(x[:,:,4], (h, w, 1))
+                    res = np.reshape(x[:,:,3], (h, w, 1))
                 
                 img = self.image_data_generator.standardize(img)
                 res = res / 255.0
                 batch_x[i] = img
                 batch_s[i] = res    
+                # print(img.shape, res.shape)
             return batch_x, batch_s    
                 
         # optionally save augmented images to disk for debugging purposes
@@ -1268,5 +1271,5 @@ class DirectoryIterator(Iterator):
             index_array = next(self.index_generator)
         # The transformation of images is not under thread lock
         # so it can be done in parallel
-        print(index_array)
+        # print(index_array)
         return self._get_batches_of_transformed_samples(index_array)
