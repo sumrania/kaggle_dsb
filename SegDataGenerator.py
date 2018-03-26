@@ -1262,7 +1262,7 @@ class DirectoryIterator(Iterator):
                     res = np.reshape(x[:,:,3:], (h, w, 2))
                 
                 img = self.image_data_generator.standardize(img)
-                res = res / 255.0
+                res[:, :, 0] = res[:, :, 0] / 255.0
                 batch_x[i] = img
                 batch_s[i] = res
             return batch_x, batch_s
