@@ -1,3 +1,4 @@
+import numpy as np
 from matplotlib import pyplot as plt
 import math
 from keras.callbacks import LambdaCallback
@@ -69,8 +70,9 @@ class LRFinder:
         K.set_value(self.model.optimizer.lr, lr)
 
     def find(self, x_train, y_train, start_lr, end_lr, batch_size=64, epochs=1):
-        num_batches = epochs * x_train.shape[0] / batch_size
-        self.lr_mult = (end_lr / start_lr) ** (1 / num_batches)
+        
+        num_batches = float(epochs*x_train.shape[0])/batch_size
+        self.lr_mult = (end_lr / start_lr) ** (1.0 / num_batches)
 
         # Save weights into a file
         self.model.save_weights('tmp.h5')
@@ -98,7 +100,8 @@ class LRFinder:
         Modification of find for data generators. train_data contains both x and y
         Note that you need to manually calculate/provide num_batches here, since we don't have the whole dataset
         """
-        self.lr_mult = (end_lr / start_lr) ** (1 / num_batches)
+
+        self.lr_mult = (end_lr / start_lr) ** (1.0 / num_batches)
 
         # Save weights into a file
         self.model.save_weights('tmp.h5')
