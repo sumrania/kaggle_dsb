@@ -106,7 +106,9 @@ def build_unet(lr, use_weights=False):
         outputs_padded = concatenate([outputs, padding_layer], axis=3)
 
         model = Model(inputs=[inputs], outputs=[outputs_padded])
-        model.compile(optimizer=opt, loss=pixelwise_weighted_cross_entropy_loss, metrics=[mean_iou])
+        # TODO figure out how to get this metric to work - keras checks input vs output dimensions
+        model.compile(optimizer=opt, loss=pixelwise_weighted_cross_entropy_loss) #, metrics=[mean_iou])
+
 
     # model.summary()
     return model
@@ -150,9 +152,19 @@ if __name__ == "__main__":
         os.makedirs(model_path)
 
     model = build_unet(lr=LEARNING_RATE, use_weights=USE_WEIGHTS)
+    # model = model.load_weights('models/unet_baseline_12.hdf5') # TODO try loading
     
     train_data, val_data = build_data_generators(data_path, BATCH_SIZE, use_weights=USE_WEIGHTS) 
-    
+
+    checkpoint = ModelCheckpoint(model_path+model_name+'_{epoch:02d}.hdf5', monitor='val_loss',
+                                 mode='min', period=1, save_weights_only=True)
+    # earlystopper = EarlyStopping(patience=5, verbose=1)
+
+    print('Start training...')
+    model.fit_generator(train_data, steps_per_epoch=STEPS_PER_EPOCH, epochs=EPOCHS, 
+                        callbacks=[checkpoint], validation_data=val_data, 
+                        validation_steps=VALIDATION_STEPS, shuffle=True)
+
     # Find optimal learning rate
     # X_train, Y_train, C_train, W_train, X_test = load_saved_data(data_path, image_size=(IMG_HEIGHT, IMG_WIDTH))
 
@@ -170,14 +182,6 @@ if __name__ == "__main__":
     # lr_finder.plot_loss_change(sma=20, n_skip_beginning=20, n_skip_end=5, y_lim=(-0.01, 0.01))
     # plt.savefig('lr_finder_loss_change_2.png')
 
-    checkpoint = ModelCheckpoint(model_path+model_name+'_{epoch:02d}.hdf5', monitor='val_loss',
-                                 mode='min', period=1)
-    earlystopper = EarlyStopping(patience=5, verbose=1)
-
-    print('Start training...')
-    model.fit_generator(train_data, steps_per_epoch=STEPS_PER_EPOCH, epochs=EPOCHS, 
-                        callbacks=[earlystopper, checkpoint], validation_data=val_data, 
-                        validation_steps=VALIDATION_STEPS, shuffle=True)
 
     # hist = model.history.history
     # plt.plot(hist['val_loss'])
