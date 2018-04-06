@@ -3,6 +3,12 @@ import math
 from keras.callbacks import LambdaCallback
 import keras.backend as K
 
+# Note: this assumes that dataset is already solved to npz (by data_preprocessing notebook)
+def load_saved_data(data_path, image_size=(256, 256)):
+    print('Reading from previously loaded data.')
+    npzfile = np.load(data_path)
+    return npzfile['X_train'], npzfile['Y_train'], npzfile['C_train'], npzfile['W_train'], npzfile['X_test']    
+
 # Utility function for plotting multiple images
 def plots(imgs, figsize=(12,6), rows=1, title=None, titles=None):
     f = plt.figure(figsize=figsize)
@@ -12,6 +18,22 @@ def plots(imgs, figsize=(12,6), rows=1, title=None, titles=None):
         sp.axis('Off')
         if titles is not None: sp.set_title(titles[i], fontsize=8)
         plt.imshow(np.squeeze(imgs[i]), cmap='gray')
+
+# Run-length encoding stolen from https://www.kaggle.com/rakhlin/fast-run-length-encoding-python
+def rle_encoding(x):
+    dots = np.where(x.T.flatten() == 1)[0]
+    run_lengths = []
+    prev = -2
+    for b in dots:
+        if (b>prev+1): run_lengths.extend((b + 1, 0))
+        run_lengths[-1] += 1
+        prev = b
+    return run_lengths
+
+def prob_to_rles(x, cutoff=0.5):
+    lab_img = label(x > cutoff)
+    for i in range(1, lab_img.max() + 1):
+        yield rle_encoding(lab_img == i)
 
 class LRFinder:
     """
