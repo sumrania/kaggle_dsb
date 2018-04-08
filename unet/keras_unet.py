@@ -12,19 +12,20 @@ from keras.layers.core import Dropout, Lambda
 from keras.layers.convolutional import Conv2D, Conv2DTranspose
 from keras.layers.pooling import MaxPooling2D
 from keras.layers.merge import concatenate
-from keras.callbacks import EarlyStopping, ModelCheckpoint
+from keras.callbacks import EarlyStopping, ModelCheckpoint, TensorBoard, ReduceLROnPlateau
 from keras import backend as K
 import tensorflow as tf
 
 from SegDataGenerator import SegDataGenerator, rgb2gray
-from my_utils import plots, load_saved_data, LRFinder
+from my_utils import plots, load_saved_data, LRFinder, CyclicLR
 
 warnings.filterwarnings('ignore', category=UserWarning, module='skimage')
 
 # Should image be larger? What's the range of image sizes in dataset (see exploration kernels)
 IMG_HEIGHT = 256
 IMG_WIDTH = 256
-IMG_CHANNELS = 1
+RGB = True
+IMG_CHANNELS = 3 if RGB else 1
 
 # Define IoU metric
 def mean_iou(y_true, y_pred):
@@ -55,7 +56,7 @@ def ConvBlock(inputs, num_kernels, kernel_shape=(3,3), p_dropout=0.1):
     conv = Conv2D(num_kernels, kernel_shape, activation='elu', kernel_initializer='he_normal', padding='same') (conv)
     return conv
 
-def build_unet(lr, use_weights=False): 
+def build_unet(lr, use_weights=False):
     print('Building U-net model')
 
     inputs = Input((IMG_HEIGHT, IMG_WIDTH, IMG_CHANNELS))
@@ -70,7 +71,7 @@ def build_unet(lr, use_weights=False):
     p3 = MaxPooling2D((2, 2)) (c3)
 
     c4 = ConvBlock(p3, 128, (3,3), 0.1)
-    p4 = MaxPooling2D(pool_size=(2, 2)) (c4)
+    p4 = MaxPooling2D((2, 2)) (c4)
 
     c5 = ConvBlock(p4, 256, (3,3), 0.3)
 
@@ -99,7 +100,7 @@ def build_unet(lr, use_weights=False):
         model.compile(optimizer=opt, loss='binary_crossentropy', metrics=[mean_iou])
 
     else: # U-net with pixelwise weights on loss
-        outputs = Conv2D(1, (1, 1), activation=None) (c9)
+        outputs = Conv2D(1, (1, 1), activation='None') (c9) # No activation because it's included in loss function
 
         # work-around for keras' output vs label dim checking - pad output with a layer of garbage
         padding_layer = Conv2D(1, (1, 1))(inputs)
@@ -117,18 +118,22 @@ def build_unet(lr, use_weights=False):
 
 def build_data_generators(data_path, batch_size, use_weights=False):
 
-    trainGenerator = SegDataGenerator(validation_split=0.2, width_shift_range=0.02,
-                                       height_shift_range=0.02, zoom_range=0.1,
-                                       horizontal_flip=True, vertical_flip=True,
-                                       featurewise_center=False, featurewise_std_normalization=False,
-                                       elastic_transform=True, rotation_right=True)
+    # trainGenerator = SegDataGenerator(validation_split=0.2, width_shift_range=0.02,
+    #                                    height_shift_range=0.02, zoom_range=0.1,
+    #                                    horizontal_flip=True, vertical_flip=True,
+    #                                    featurewise_center=False, featurewise_std_normalization=False,
+    #                                    elastic_transform=True, rotation_right=True)
+    trainGenerator = SegDataGenerator(validation_split=0.2,
+                                      horizontal_flip=True, vertical_flip=True,
+                                      elastic_transform=True, rotation_right=True)
     # trainGenerator.fit(X_train) # if normalization is on - TODO try this
 
+    color_mode = 'rgb' if RGB else 'grayscale'
     train_data = trainGenerator.flow_from_directory(data_path, subset='training', batch_size=batch_size,
-                                                   class_mode='segmentation', color_mode='grayscale',
+                                                   class_mode='segmentation', color_mode=color_mode,
                                                    use_weights=use_weights, use_contour=False, label_bw=True)
     val_data = trainGenerator.flow_from_directory(data_path, subset='validation', batch_size=batch_size,
-                                                  class_mode='segmentation', color_mode='grayscale', 
+                                                  class_mode='segmentation', color_mode=color_mode, 
                                                   use_weights=use_weights, use_contour=False, label_bw=True)
 
     return train_data, val_data
@@ -137,53 +142,59 @@ def build_data_generators(data_path, batch_size, use_weights=False):
 if __name__ == "__main__":
 
     EPOCHS = 30
-    BATCH_SIZE = 8
+    BATCH_SIZE = 16
     STEPS_PER_EPOCH = 250
     VALIDATION_STEPS = 10
 
-    LEARNING_RATE = 1e-3
-    USE_WEIGHTS = False # TODO debug
+    LEARNING_RATE = 1e-4
+    USE_WEIGHTS = False
 
     data_path = '../data/dataset_256x256.npz'
-    model_path = 'models/'
-    model_name = 'unet_baseline'
+    save_path = 'models/'
+    model_name = 'unet_rgb_elastic_clr'
 
-    if not os.path.exists(model_path):
-        os.makedirs(model_path)
+    print(model_name)
+    print('RGB: {}, USE_WEIGHTS: {}, lr: {}'.format(RGB, USE_WEIGHTS, LEARNING_RATE))
+
+    if not os.path.exists(save_path):
+        os.makedirs(save_path)
 
     model = build_unet(lr=LEARNING_RATE, use_weights=USE_WEIGHTS)
     # model = model.load_weights('models/unet_baseline_12.hdf5') # TODO try loading
-    
-    train_data, val_data = build_data_generators(data_path, BATCH_SIZE, use_weights=USE_WEIGHTS) 
 
-    checkpoint = ModelCheckpoint(model_path+model_name+'_{epoch:02d}.hdf5', monitor='val_loss',
+    train_data, val_data = build_data_generators(data_path, BATCH_SIZE, use_weights=USE_WEIGHTS)
+
+    checkpoint = ModelCheckpoint(save_path+model_name+'_{epoch:02d}.hdf5', monitor='val_loss',
                                  mode='min', period=1, save_weights_only=True)
-    # earlystopper = EarlyStopping(patience=5, verbose=1)
+    earlystopper = EarlyStopping(monitor='val_loss', patience=3, verbose=1)
+    cyclic_lr = CyclicLR(base_lr=1e-4, max_lr=1e-3, step_size=2*STEPS_PER_EPOCH,
+                         mode='triangular')
+    tensorboard = TensorBoard(log_dir='/tmp/unet')
+    ReduceLROnPlateau(monitor='val_loss', factor=0.2, patience=3, verbose=1)
+
+    callbacks = [checkpoint, earlystopper, cyclic_lr]
+    print('Callbacks: ', callbacks)
 
     print('Start training...')
-    model.fit_generator(train_data, steps_per_epoch=STEPS_PER_EPOCH, epochs=EPOCHS, 
-                        callbacks=[checkpoint], validation_data=val_data, 
+    model.fit_generator(train_data, steps_per_epoch=STEPS_PER_EPOCH, epochs=EPOCHS,
+                        callbacks=callbacks,
+                        validation_data=val_data,
                         validation_steps=VALIDATION_STEPS, shuffle=True)
 
-    # Find optimal learning rate
-    # X_train, Y_train, C_train, W_train, X_test = load_saved_data(data_path, image_size=(IMG_HEIGHT, IMG_WIDTH))
+    # See viz_model.ipynb for visualizations and run-length encoding
+
+    ### Find optimal learning rate
 
     # print('Running learning rate range finder')
-    # X_train, Y_train = X_train[:100], Y_train[:100]
-    # X_train_gray = np.zeros((X_train.shape[0], X_train.shape[1], X_train.shape[2], 1))
-    # for i in range(X_train.shape[0]): 
-    #     X_train_gray[i] = rgb2gray(X_train[i])
+    # X_train, Y_train, C_train, W_train, X_test = load_saved_data(data_path, image_size=(IMG_HEIGHT, IMG_WIDTH))
 
     # lr_finder = LRFinder(model)
-    # # lr_finder.find_generator(train_data, start_lr=1e-4, end_lr=1, num_batches=(X_train.shape[0]/BATCH_SIZE), epochs=1)
-    # lr_finder.find(X_train_gray, Y_train, start_lr=0.0001, end_lr=1.0, batch_size=512, epochs=5)
+    # lr_finder.find_generator(train_data, start_lr=1e-5, end_lr=1, num_batches=300, epochs=1)
     # lr_finder.plot_loss(n_skip_beginning=20, n_skip_end=5)
     # plt.savefig('lr_finder_loss_2.png')
     # lr_finder.plot_loss_change(sma=20, n_skip_beginning=20, n_skip_end=5, y_lim=(-0.01, 0.01))
     # plt.savefig('lr_finder_loss_change_2.png')
 
-
     # hist = model.history.history
     # plt.plot(hist['val_loss'])
 
-    # TODO make notebook for visualizing trained network performance
