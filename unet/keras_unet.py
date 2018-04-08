@@ -21,12 +21,6 @@ from my_utils import plots, load_saved_data, LRFinder, CyclicLR
 
 warnings.filterwarnings('ignore', category=UserWarning, module='skimage')
 
-# Should image be larger? What's the range of image sizes in dataset (see exploration kernels)
-IMG_HEIGHT = 256
-IMG_WIDTH = 256
-RGB = True
-IMG_CHANNELS = 3 if RGB else 1
-
 # Define IoU metric
 def mean_iou(y_true, y_pred):
     prec = []
@@ -56,7 +50,7 @@ def ConvBlock(inputs, num_kernels, kernel_shape=(3,3), p_dropout=0.1):
     conv = Conv2D(num_kernels, kernel_shape, activation='elu', kernel_initializer='he_normal', padding='same') (conv)
     return conv
 
-def build_unet(lr, use_weights=False):
+def build_unet(lr, IMG_HEIGHT, IMG_WIDTH, IMG_CHANNELS, use_weights=False):
     print('Building U-net model')
 
     inputs = Input((IMG_HEIGHT, IMG_WIDTH, IMG_CHANNELS))
@@ -141,6 +135,13 @@ def build_data_generators(data_path, batch_size, use_weights=False):
 
 if __name__ == "__main__":
 
+    # Should image be larger? What's the range of image sizes in dataset (see exploration kernels)
+    IMG_HEIGHT = 256
+    IMG_WIDTH = 256
+    RGB = True
+    IMG_CHANNELS = 3 if RGB else 1
+
+
     EPOCHS = 30
     BATCH_SIZE = 16
     STEPS_PER_EPOCH = 250
@@ -159,7 +160,7 @@ if __name__ == "__main__":
     if not os.path.exists(save_path):
         os.makedirs(save_path)
 
-    model = build_unet(lr=LEARNING_RATE, use_weights=USE_WEIGHTS)
+    model = build_unet(LEARNING_RATE, IMG_HEIGHT, IMG_WIDTH, IMG_CHANNELS, USE_WEIGHTS)
     # model = model.load_weights('models/unet_baseline_12.hdf5') # TODO try loading
 
     train_data, val_data = build_data_generators(data_path, BATCH_SIZE, use_weights=USE_WEIGHTS)

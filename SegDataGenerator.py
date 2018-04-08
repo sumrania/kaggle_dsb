@@ -1180,7 +1180,7 @@ class DirectoryIterator(Iterator):
                 weights = npzfile['W_train']
                 self.weights = weights[int((1-validation_split)*num_images):]
             self.samples = len(self.images)
-        else:
+        else: # testing
             self.images = npzfile['X_test']
             self.samples = len(self.images)
         
@@ -1205,13 +1205,26 @@ class DirectoryIterator(Iterator):
         super(DirectoryIterator, self).__init__(self.samples, batch_size, shuffle, seed)
 
     def _get_batches_of_transformed_samples(self, index_array):
-#         print("get into get batches")
+        print(index_array)
         batch_x = np.zeros((len(index_array),) + self.image_shape, dtype=K.floatx())
-        # batch_s = np.zeros((len(index_array),) + self.image_shape, dtype=K.floatx())
         batch_s = np.zeros((len(index_array), self.image_shape[0], self.image_shape[1], 1), dtype=K.floatx())
 
         h, w = self.image_shape[0], self.image_shape[1]    
         grayscale = self.color_mode == 'grayscale'
+
+        if self.subset == 'testing':
+            for i, j in enumerate(index_array):
+                img = self.images[j]
+                if grayscale == True and img.shape[2] != 1:
+                    img = rgb2gray(img)
+                x = self.image_data_generator.random_transform(x)
+                if grayscale == True:
+                    img = np.reshape(x[:,:,0], (h, w, 1))
+                else:
+                    img = x[:,:,0:3]
+                img = self.image_data_generator.standardize(img)
+                batch_x[i] = img
+            return batch_x
 
         if self.use_contour == True:
             batch_c = np.zeros((len(index_array),) + self.image_shape, dtype=K.floatx())
@@ -1224,7 +1237,6 @@ class DirectoryIterator(Iterator):
                 if grayscale == True and img.shape[2] != 1:
                     img = rgb2gray(img)
                 x = np.concatenate((img, res), axis=2)
-#                 print("get into random transform")
                 x = self.image_data_generator.random_transform(x)
                 if grayscale == True:
                     img = np.reshape(x[:,:,0], (h, w, 1))
@@ -1240,7 +1252,6 @@ class DirectoryIterator(Iterator):
                 batch_c[i] = np.reshape(res[:,:,1], (h, w, 1))
             return batch_x, {'segmentation': batch_s, 'contour': batch_c}
         elif self.use_weights:
-            batch_x = np.zeros((len(index_array),) + self.image_shape, dtype=K.floatx())
             # labels have two layers: mask and weights
             batch_s = np.zeros((len(index_array), self.image_shape[0], self.image_shape[1], 2), dtype=K.floatx())
 
@@ -1270,14 +1281,12 @@ class DirectoryIterator(Iterator):
         else: 
             for i, j in enumerate(index_array):
                 img = self.images[j]
-                # plt.imshow(np.squeeze(img), cmap='gray')
                 label = self.labels[j]
                 res = label
                 # grayscale
                 if grayscale == True and img.shape[2] != 1:
                     img = rgb2gray(img)
                 x = np.concatenate((img, res), axis=2)
-#                 print("get into random transform")
                 x = self.image_data_generator.random_transform(x)
                 if grayscale == True:
                     img = np.reshape(x[:,:,0], (h, w, 1))
@@ -1290,7 +1299,6 @@ class DirectoryIterator(Iterator):
                 res = res / 255.0
                 batch_x[i] = img
                 batch_s[i] = res    
-                # print(img.shape, res.shape)
             return batch_x, batch_s    
                 
         # optionally save augmented images to disk for debugging purposes
