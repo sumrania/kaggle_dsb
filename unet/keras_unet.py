@@ -9,6 +9,7 @@ from keras import optimizers
 from keras.models import Model, load_model
 from keras.layers import Input
 from keras.layers.core import Dropout, Lambda
+from keras.layers import BatchNormalization
 from keras.layers.convolutional import Conv2D, Conv2DTranspose
 from keras.layers.pooling import MaxPooling2D
 from keras.layers.merge import concatenate
@@ -39,15 +40,14 @@ def pixelwise_weighted_cross_entropy_loss(y_true, y_pred):
     pred = tf.gather(y_pred, [0], axis=3)
     mask = tf.gather(y_true, [0], axis=3)
     weights = tf.gather(y_true, [1], axis=3)
-    loss = tf.losses.sigmoid_cross_entropy(multi_class_labels=mask, 
-                                   logits=pred,
-                                   weights=weights)
+    loss = tf.losses.sigmoid_cross_entropy(multi_class_labels=mask, logits=pred, weights=weights)
     return loss
 
 def ConvBlock(inputs, num_kernels, kernel_shape=(3,3), p_dropout=0.1):
     conv = Conv2D(num_kernels, kernel_shape, activation='elu', kernel_initializer='he_normal', padding='same') (inputs)
     conv = Dropout(p_dropout) (conv)
     conv = Conv2D(num_kernels, kernel_shape, activation='elu', kernel_initializer='he_normal', padding='same') (conv)
+    conv = BatchNormalization() (conv)
     return conv
 
 def build_unet(lr, IMG_HEIGHT, IMG_WIDTH, IMG_CHANNELS, use_weights=False):
@@ -164,6 +164,14 @@ if __name__ == "__main__":
 
     train_data, val_data = build_data_generators(data_path, BATCH_SIZE, use_weights=USE_WEIGHTS)
 
+    # lr_finder = LRFinder(model)
+    # lr_finder.find_generator(train_data, start_lr=1e-6, end_lr=1, num_batches=300, epochs=1)
+    # lr_finder.plot_loss(n_skip_beginning=0, n_skip_end=0)
+    # plt.savefig('lr_finder_loss.png')
+    # lr_finder.plot_loss_change(sma=20, n_skip_beginning=0, n_skip_end=0, y_lim=(-0.01, 0.01))
+    # plt.savefig('lr_finder_loss_change.png')
+    # import pdb; pdb.set_trace()
+
     checkpoint = ModelCheckpoint(save_path+model_name+'_{epoch:02d}.hdf5', monitor='val_loss',
                                  mode='min', period=1, save_weights_only=True)
     earlystopper = EarlyStopping(monitor='val_loss', patience=3, verbose=1)
@@ -187,13 +195,6 @@ if __name__ == "__main__":
 
     # print('Running learning rate range finder')
     # X_train, Y_train, C_train, W_train, X_test = load_saved_data(data_path, image_size=(IMG_HEIGHT, IMG_WIDTH))
-
-    # lr_finder = LRFinder(model)
-    # lr_finder.find_generator(train_data, start_lr=1e-5, end_lr=1, num_batches=300, epochs=1)
-    # lr_finder.plot_loss(n_skip_beginning=20, n_skip_end=5)
-    # plt.savefig('lr_finder_loss_2.png')
-    # lr_finder.plot_loss_change(sma=20, n_skip_beginning=20, n_skip_end=5, y_lim=(-0.01, 0.01))
-    # plt.savefig('lr_finder_loss_change_2.png')
 
     # hist = model.history.history
     # plt.plot(hist['val_loss'])

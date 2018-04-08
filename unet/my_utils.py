@@ -54,6 +54,7 @@ class LRFinder:
         # Log the learning rate
         lr = K.get_value(self.model.optimizer.lr)
         self.lrs.append(lr)
+        print('New learning rate: ', lr)
 
         # Log the loss
         loss = logs['loss']
