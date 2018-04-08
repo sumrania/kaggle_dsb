@@ -1205,7 +1205,6 @@ class DirectoryIterator(Iterator):
         super(DirectoryIterator, self).__init__(self.samples, batch_size, shuffle, seed)
 
     def _get_batches_of_transformed_samples(self, index_array):
-        print(index_array)
         batch_x = np.zeros((len(index_array),) + self.image_shape, dtype=K.floatx())
         batch_s = np.zeros((len(index_array), self.image_shape[0], self.image_shape[1], 1), dtype=K.floatx())
 
