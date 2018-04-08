@@ -5,6 +5,7 @@ import os, sys, warnings, random
 import numpy as np
 import matplotlib.pyplot as plt
 
+import keras
 from keras import optimizers
 from keras.models import Model, load_model
 from keras.layers import Input
@@ -55,16 +56,21 @@ def build_unet(lr, IMG_HEIGHT, IMG_WIDTH, IMG_CHANNELS, use_weights=False):
 
     inputs = Input((IMG_HEIGHT, IMG_WIDTH, IMG_CHANNELS))
 
-    c1 = ConvBlock(inputs, 16, (3,3), 0.1)
+    # c1 = ConvBlock(inputs, 16, (3,3), 0.1)
+    c1 = ConvBlock(inputs, 64, (3,3), 0.1)
     p1 = MaxPooling2D((2, 2)) (c1)
 
-    c2 = ConvBlock(p1, 32, (3,3), 0.1)
+    # c2 = ConvBlock(p1, 32, (3,3), 0.1)
+    c2 = ConvBlock(p1, 128, (3,3), 0.1)
     p2 = MaxPooling2D((2, 2)) (c2)
 
-    c3 = ConvBlock(p2, 64, (3,3), 0.1)
+    # c3 = ConvBlock(p2, 64, (3,3), 0.1)
+    c3 = ConvBlock(p2, 256, (3,3), 0.1)
+    c3 = Conv2D(256, (3,3), activation='elu', kernel_initializer='he_normal', padding='same') (c3)
     p3 = MaxPooling2D((2, 2)) (c3)
 
-    c4 = ConvBlock(p3, 128, (3,3), 0.1)
+    c4 = ConvBlock(p3, 512, (3,3), 0.1)
+    c4 = Conv2D(512, (3,3), activation='elu', kernel_initializer='he_normal', padding='same') (c4)
     p4 = MaxPooling2D((2, 2)) (c4)
 
     c5 = ConvBlock(p4, 256, (3,3), 0.3)
@@ -162,6 +168,16 @@ if __name__ == "__main__":
     model = build_unet(LEARNING_RATE, IMG_HEIGHT, IMG_WIDTH, IMG_CHANNELS, USE_WEIGHTS)
     # model = model.load_weights('models/unet_baseline_12.hdf5') # TODO try loading
 
+    # Copy first 10 conv layers from here
+    # From: https://stackoverflow.com/questions/43294367/how-can-i-load-the-weights-only-for-some-layers#43294368
+    # index matches found manually, using code at bottom 
+    print('Initializing "encoder" with pre-trained VGG16')
+    vgg16 = keras.applications.vgg16.VGG16()
+    vgglayeridx_to_unetlayeridx = { 1:1, 2:3, 4:6, 5:8, 7:11, 8:13, 9:15, 11:17, 12:19, 13:21}
+    for idx in vgglayeridx_to_unetlayeridx.keys():
+        vgg_idx, unet_idx = idx, vgglayeridx_to_unetlayeridx[idx]
+        model.layers[unet_idx].set_weights(vgg16.layers[vgg_idx].get_weights())
+
     train_data, val_data = build_data_generators(data_path, BATCH_SIZE, use_weights=USE_WEIGHTS)
 
     # lr_finder = LRFinder(model)
@@ -199,3 +215,14 @@ if __name__ == "__main__":
     # hist = model.history.history
     # plt.plot(hist['val_loss'])
 
+
+    # VGG to U-net index matching
+    # for i, o in enumerate(vgg16.layers): 
+    #     if(isinstance(o, keras.layers.convolutional.Conv2D)): 
+    #         print(i)
+    #         print(o.get_weights()[0].shape)
+
+    # for i, o in enumerate(model.layers): 
+    #     if(isinstance(o, keras.layers.convolutional.Conv2D)): 
+    #         print(i)
+    #         print(o.get_weights()[0].shape)
