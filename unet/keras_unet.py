@@ -94,7 +94,7 @@ def build_unet(lr, IMG_HEIGHT, IMG_WIDTH, IMG_CHANNELS, use_weights=False):
         model.compile(optimizer=opt, loss='binary_crossentropy', metrics=[mean_iou])
 
     else: # U-net with pixelwise weights on loss
-        outputs = Conv2D(1, (1, 1), activation='None') (c9) # No activation because it's included in loss function
+        outputs = Conv2D(1, (1, 1), activation=None) (c9) # No activation because it's included in loss function
 
         # work-around for keras' output vs label dim checking - pad output with a layer of garbage
         padding_layer = Conv2D(1, (1, 1))(inputs)
@@ -141,18 +141,17 @@ if __name__ == "__main__":
     RGB = True
     IMG_CHANNELS = 3 if RGB else 1
 
-
     EPOCHS = 30
     BATCH_SIZE = 16
     STEPS_PER_EPOCH = 250
     VALIDATION_STEPS = 10
 
     LEARNING_RATE = 1e-4
-    USE_WEIGHTS = False
+    USE_WEIGHTS = True
 
     data_path = '../data/dataset_256x256.npz'
     save_path = 'models/'
-    model_name = 'unet_rgb_elastic_clr'
+    model_name = 'unet_rgb_weights'
 
     print(model_name)
     print('RGB: {}, USE_WEIGHTS: {}, lr: {}'.format(RGB, USE_WEIGHTS, LEARNING_RATE))
@@ -173,7 +172,7 @@ if __name__ == "__main__":
     tensorboard = TensorBoard(log_dir='/tmp/unet')
     ReduceLROnPlateau(monitor='val_loss', factor=0.2, patience=3, verbose=1)
 
-    callbacks = [checkpoint, earlystopper, cyclic_lr]
+    callbacks = [checkpoint, earlystopper]
     print('Callbacks: ', callbacks)
 
     print('Start training...')
