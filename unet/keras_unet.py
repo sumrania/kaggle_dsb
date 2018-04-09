@@ -111,7 +111,6 @@ def build_unet(lr, IMG_HEIGHT, IMG_WIDTH, IMG_CHANNELS, use_weights=False):
         # TODO figure out how to get this metric to work - keras checks input vs output dimensions
         model.compile(optimizer=opt, loss=pixelwise_weighted_cross_entropy_loss) #, metrics=[mean_iou])
 
-
     # model.summary()
     return model
 
@@ -143,8 +142,8 @@ def build_data_generators(data_path, batch_size, use_weights=False):
 if __name__ == "__main__":
 
     # Should image be larger? What's the range of image sizes in dataset (see exploration kernels)
-    IMG_HEIGHT = 256
-    IMG_WIDTH = 256
+    IMG_HEIGHT = 384
+    IMG_WIDTH = 384
     RGB = True
     IMG_CHANNELS = 3 if RGB else 1
 
@@ -158,7 +157,7 @@ if __name__ == "__main__":
 
     data_path = '../data/dataset_fixed_256x256.npz'
     save_path = 'models/'
-    model_name = 'unet_rgb_batchnorm_fixed'
+    model_name = 'unet_rgb_batchnorm_fixed_384'
 
     print(model_name)
     print('RGB: {}, USE_WEIGHTS: {}, lr: {}'.format(RGB, USE_WEIGHTS, LEARNING_RATE))
