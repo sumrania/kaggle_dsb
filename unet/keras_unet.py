@@ -104,7 +104,7 @@ def build_unet(lr, IMG_HEIGHT, IMG_WIDTH, IMG_CHANNELS, use_weights=False):
         outputs = Conv2D(1, (1, 1), activation=None) (c9) # No activation because it's included in loss function
 
         # work-around for keras' output vs label dim checking - pad output with a layer of garbage
-	padding_layer = tf.zeros_like(outputs)
+        padding_layer = tf.zeros_like(outputs)
         outputs_padded = concatenate([outputs, padding_layer], axis=3)
 
         model = Model(inputs=[inputs], outputs=[outputs_padded])
@@ -116,7 +116,7 @@ def build_unet(lr, IMG_HEIGHT, IMG_WIDTH, IMG_CHANNELS, use_weights=False):
 
 
 
-def build_data_generators(data_path, batch_size, use_weights=False):
+def build_data_generators(data_path, batch_size, target_size, use_weights=False):
 
     # trainGenerator = SegDataGenerator(validation_split=0.2, width_shift_range=0.02,
     #                                    height_shift_range=0.02, zoom_range=0.1,
@@ -131,10 +131,12 @@ def build_data_generators(data_path, batch_size, use_weights=False):
     color_mode = 'rgb' if RGB else 'grayscale'
     train_data = trainGenerator.flow_from_directory(data_path, subset='training', batch_size=batch_size,
                                                    class_mode='segmentation', color_mode=color_mode,
-                                                   use_weights=use_weights, use_contour=False, label_bw=True)
+                                                   use_weights=use_weights, use_contour=False, label_bw=True,
+                                                   target_size=target_size)
     val_data = trainGenerator.flow_from_directory(data_path, subset='validation', batch_size=batch_size,
                                                   class_mode='segmentation', color_mode=color_mode, 
-                                                  use_weights=use_weights, use_contour=False, label_bw=True)
+                                                  use_weights=use_weights, use_contour=False, label_bw=True, 
+                                                  target_size=target_size)
 
     return train_data, val_data
 
@@ -155,7 +157,7 @@ if __name__ == "__main__":
     LEARNING_RATE = 1e-4
     USE_WEIGHTS = False
 
-    data_path = '../data/dataset_fixed_256x256.npz'
+    data_path = '../data/dataset_fixed_384x384.npz'
     save_path = 'models/'
     model_name = 'unet_rgb_batchnorm_fixed_384'
 
@@ -178,7 +180,7 @@ if __name__ == "__main__":
     #     vgg_idx, unet_idx = idx, vgglayeridx_to_unetlayeridx[idx]
     #     model.layers[unet_idx].set_weights(vgg16.layers[vgg_idx].get_weights())
 
-    train_data, val_data = build_data_generators(data_path, BATCH_SIZE, use_weights=USE_WEIGHTS)
+    train_data, val_data = build_data_generators(data_path, BATCH_SIZE, target_size=(IMG_HEIGHT,IMG_WIDTH), use_weights=USE_WEIGHTS)
 
     # lr_finder = LRFinder(model)
     # lr_finder.find_generator(train_data, start_lr=1e-6, end_lr=1, num_batches=300, epochs=1)
