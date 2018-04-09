@@ -37,7 +37,7 @@ def mean_iou(y_true, y_pred):
 
 # remove sigmoid activation on last layer if using this
 def pixelwise_weighted_cross_entropy_loss(y_true, y_pred):
-    
+
     pred = tf.gather(y_pred, [0], axis=3)
     mask = tf.gather(y_true, [0], axis=3)
     weights = tf.gather(y_true, [1], axis=3)
@@ -56,21 +56,22 @@ def build_unet(lr, IMG_HEIGHT, IMG_WIDTH, IMG_CHANNELS, use_weights=False):
 
     inputs = Input((IMG_HEIGHT, IMG_WIDTH, IMG_CHANNELS))
 
-    # c1 = ConvBlock(inputs, 16, (3,3), 0.1)
-    c1 = ConvBlock(inputs, 64, (3,3), 0.1)
+    c1 = ConvBlock(inputs, 16, (3,3), 0.1)
+    # c1 = ConvBlock(inputs, 64, (3,3), 0.1)
     p1 = MaxPooling2D((2, 2)) (c1)
 
-    # c2 = ConvBlock(p1, 32, (3,3), 0.1)
-    c2 = ConvBlock(p1, 128, (3,3), 0.1)
+    c2 = ConvBlock(p1, 32, (3,3), 0.1)
+    # c2 = ConvBlock(p1, 128, (3,3), 0.1)
     p2 = MaxPooling2D((2, 2)) (c2)
 
-    # c3 = ConvBlock(p2, 64, (3,3), 0.1)
-    c3 = ConvBlock(p2, 256, (3,3), 0.1)
-    c3 = Conv2D(256, (3,3), activation='elu', kernel_initializer='he_normal', padding='same') (c3)
+    c3 = ConvBlock(p2, 64, (3,3), 0.1)
+    # c3 = ConvBlock(p2, 256, (3,3), 0.1)
+    # c3 = Conv2D(256, (3,3), activation='elu', kernel_initializer='he_normal', padding='same') (c3)
     p3 = MaxPooling2D((2, 2)) (c3)
 
-    c4 = ConvBlock(p3, 512, (3,3), 0.1)
-    c4 = Conv2D(512, (3,3), activation='elu', kernel_initializer='he_normal', padding='same') (c4)
+    c4 = ConvBlock(p3, 128, (3,3), 0.1)
+    # c4 = ConvBlock(p3, 512, (3,3), 0.1)
+    # c4 = Conv2D(512, (3,3), activation='elu', kernel_initializer='he_normal', padding='same') (c4)
     p4 = MaxPooling2D((2, 2)) (c4)
 
     c5 = ConvBlock(p4, 256, (3,3), 0.3)
@@ -103,7 +104,7 @@ def build_unet(lr, IMG_HEIGHT, IMG_WIDTH, IMG_CHANNELS, use_weights=False):
         outputs = Conv2D(1, (1, 1), activation=None) (c9) # No activation because it's included in loss function
 
         # work-around for keras' output vs label dim checking - pad output with a layer of garbage
-        padding_layer = Conv2D(1, (1, 1))(inputs)
+	padding_layer = tf.zeros_like(outputs)
         outputs_padded = concatenate([outputs, padding_layer], axis=3)
 
         model = Model(inputs=[inputs], outputs=[outputs_padded])
@@ -153,11 +154,11 @@ if __name__ == "__main__":
     VALIDATION_STEPS = 10
 
     LEARNING_RATE = 1e-4
-    USE_WEIGHTS = True
+    USE_WEIGHTS = False
 
-    data_path = '../data/dataset_256x256.npz'
+    data_path = '../data/dataset_fixed_256x256.npz'
     save_path = 'models/'
-    model_name = 'unet_rgb_weights'
+    model_name = 'unet_rgb_batchnorm_fixed'
 
     print(model_name)
     print('RGB: {}, USE_WEIGHTS: {}, lr: {}'.format(RGB, USE_WEIGHTS, LEARNING_RATE))
@@ -170,13 +171,13 @@ if __name__ == "__main__":
 
     # Copy first 10 conv layers from here
     # From: https://stackoverflow.com/questions/43294367/how-can-i-load-the-weights-only-for-some-layers#43294368
-    # index matches found manually, using code at bottom 
-    print('Initializing "encoder" with pre-trained VGG16')
-    vgg16 = keras.applications.vgg16.VGG16()
-    vgglayeridx_to_unetlayeridx = { 1:1, 2:3, 4:6, 5:8, 7:11, 8:13, 9:15, 11:17, 12:19, 13:21}
-    for idx in vgglayeridx_to_unetlayeridx.keys():
-        vgg_idx, unet_idx = idx, vgglayeridx_to_unetlayeridx[idx]
-        model.layers[unet_idx].set_weights(vgg16.layers[vgg_idx].get_weights())
+    # index matches found manually, using code at bottom
+    # print('Initializing "encoder" with pre-trained VGG16 weights')
+    # vgg16 = keras.applications.vgg16.VGG16()
+    # vgglayeridx_to_unetlayeridx = { 1:1, 2:3, 4:6, 5:8, 7:11, 8:13, 9:15, 11:17, 12:19, 13:21}
+    # for idx in vgglayeridx_to_unetlayeridx.keys():
+    #     vgg_idx, unet_idx = idx, vgglayeridx_to_unetlayeridx[idx]
+    #     model.layers[unet_idx].set_weights(vgg16.layers[vgg_idx].get_weights())
 
     train_data, val_data = build_data_generators(data_path, BATCH_SIZE, use_weights=USE_WEIGHTS)
 
@@ -189,7 +190,7 @@ if __name__ == "__main__":
     # import pdb; pdb.set_trace()
 
     checkpoint = ModelCheckpoint(save_path+model_name+'_{epoch:02d}.hdf5', monitor='val_loss',
-                                 mode='min', period=1, save_weights_only=True)
+                                 mode='min', period=1, save_weights_only=False)
     earlystopper = EarlyStopping(monitor='val_loss', patience=3, verbose=1)
     cyclic_lr = CyclicLR(base_lr=1e-4, max_lr=1e-3, step_size=2*STEPS_PER_EPOCH,
                          mode='triangular')
