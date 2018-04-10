@@ -1,5 +1,5 @@
 # source activate tensorflow_p27
-# pip install scikit-image opencv-python
+# pip install scikit-image opencv-python keras
 
 import os, sys, warnings, random
 import numpy as np
@@ -35,9 +35,26 @@ def mean_iou(y_true, y_pred):
         prec.append(score)
     return K.mean(K.stack(prec), axis=0)
 
+# TODO try this
+def jaccard_dice_coeff_loss(y_true, y_pred):
+    """
+    Dice loss based on Jaccard dice score coefficent.
+    """
+
+    IMG_HEIGHT = IMG_WIDTH = 256 # TODO make sure these are same as in main
+    axis = np.arange(1,len([IMG_HEIGHT,IMG_WIDTH,1])+1)
+    offset = 1e-5
+
+    corr = tf.reduce_sum(y_true * y_pred, axis=axis)
+    l2_pred = tf.reduce_sum(tf.square(y_pred), axis=axis)
+    l2_true = tf.reduce_sum(tf.square(y_true), axis=axis)
+    dice_coeff = (2. * corr + 1e-5) / (l2_true + l2_pred + 1e-5)
+    loss = tf.subtract(1., tf.reduce_mean(dice_coeff))
+
+    return loss
+
 # remove sigmoid activation on last layer if using this
 def pixelwise_weighted_cross_entropy_loss(y_true, y_pred):
-    
     pred = tf.gather(y_pred, [0], axis=3)
     mask = tf.gather(y_true, [0], axis=3)
     weights = tf.gather(y_true, [1], axis=3)
@@ -103,7 +120,7 @@ def build_unet(lr, IMG_HEIGHT, IMG_WIDTH, IMG_CHANNELS, use_weights=False):
         outputs = Conv2D(1, (1, 1), activation=None) (c9) # No activation because it's included in loss function
 
         # work-around for keras' output vs label dim checking - pad output with a layer of garbage
-        padding_layer = Conv2D(1, (1, 1))(inputs)
+        padding_layer = tf.zeros_like(outputs)
         outputs_padded = concatenate([outputs, padding_layer], axis=3)
 
         model = Model(inputs=[inputs], outputs=[outputs_padded])
