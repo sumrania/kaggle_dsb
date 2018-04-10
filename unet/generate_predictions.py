@@ -1,5 +1,6 @@
 import os
 import sys
+sys.path.append('../notebooks/')
 
 import random
 import numpy as np
@@ -39,7 +40,7 @@ if __name__=="__main__":
     RGB = True
     USE_WEIGHTS = False
 
-    IMG_HEIGHT = IMG_WIDTH= 256
+    IMG_HEIGHT = IMG_WIDTH= 384
     IMG_CHANNELS = 3 if RGB else 1
 
     npz_save_name = 'unet_predictions.npz'
@@ -53,10 +54,10 @@ if __name__=="__main__":
     # model = build_unet(0.0, IMG_HEIGHT, IMG_WIDTH, IMG_CHANNELS, USE_WEIGHTS)
     # model.load_weights(weights_path)
 
-    model_path = 'models/unet_rgb_vgg16_batchnorm_28.hdf5'
+    model_path = 'models/unet_rgb_batchnorm_fixed_384_27.hdf5'
     model = load_model(model_path, custom_objects={'mean_iou': mean_iou})
 
-    data_path = '../data/dataset_256x256.npz'
+    data_path = '../data/dataset_fixed_384x384.npz'
     X_train, Y_train, C_train, W_train, X_test = load_saved_data(data_path, image_size=(IMG_HEIGHT, IMG_WIDTH))
 
     # TODO convert to grayscale
