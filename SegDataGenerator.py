@@ -1221,6 +1221,7 @@ class DirectoryIterator(Iterator):
                     img = np.reshape(x[:,:,0], (h, w, 1))
                 else:
                     img = x[:,:,0:3]
+                img = img * 1.0
                 img = self.image_data_generator.standardize(img)
                 batch_x[i] = img
             return batch_x
