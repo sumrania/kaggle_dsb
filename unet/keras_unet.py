@@ -152,17 +152,21 @@ def build_unet(lr, IMG_HEIGHT, IMG_WIDTH, IMG_CHANNELS, use_weights=False):
 
 
 
-def build_data_generators(data_path, batch_size, target_size, use_weights=False):
+def build_data_generators(data_path, batch_size, target_size, use_weights=False, normalize=False, X_train=None):
 
     # trainGenerator = SegDataGenerator(validation_split=0.2, width_shift_range=0.02,
     #                                    height_shift_range=0.02, zoom_range=0.1,
     #                                    horizontal_flip=True, vertical_flip=True,
     #                                    featurewise_center=False, featurewise_std_normalization=False,
     #                                    elastic_transform=True, rotation_right=True)
+
     trainGenerator = SegDataGenerator(validation_split=0.2,
                                       horizontal_flip=True, vertical_flip=True,
-                                      elastic_transform=True, rotation_right=True)
-    # trainGenerator.fit(X_train) # if normalization is on - TODO try this
+                                      elastic_transform=True, rotation_right=True, 
+                                      featurewise_center=normalize, featurewise_std_normalization=normalize)
+
+    if normalize: 
+        trainGenerator.fit(X_train) # if normalization is on - TODO try this
 
     color_mode = 'rgb' if RGB else 'grayscale'
     train_data = trainGenerator.flow_from_directory(data_path, subset='training', batch_size=batch_size,
@@ -192,6 +196,7 @@ if __name__ == "__main__":
 
     LEARNING_RATE = 1e-4
     USE_WEIGHTS = True
+    NORMALIZE = False
 
     data_path = '../data/dataset_fixed_256x256.npz'
     save_path = 'models/'
@@ -217,7 +222,14 @@ if __name__ == "__main__":
     #     vgg_idx, unet_idx = idx, vgglayeridx_to_unetlayeridx[idx]
     #     model.layers[unet_idx].set_weights(vgg16.layers[vgg_idx].get_weights())
 
-    train_data, val_data = build_data_generators(data_path, BATCH_SIZE, target_size=(IMG_HEIGHT,IMG_WIDTH), use_weights=USE_WEIGHTS)
+    if NORMALIZE:
+        X_train, _, _, _, _ = load_saved_data(data_path, image_size=(IMG_HEIGHT, IMG_WIDTH))
+    else:
+        X_train = None
+
+    train_data, val_data = build_data_generators(data_path, BATCH_SIZE, 
+                            target_size=(IMG_HEIGHT,IMG_WIDTH), use_weights=USE_WEIGHTS, 
+                            normalize=NORMALIZE, X_train=X_train)
 
     # lr_finder = LRFinder(model)
     # lr_finder.find_generator(train_data, start_lr=1e-6, end_lr=1, num_batches=300, epochs=1)
