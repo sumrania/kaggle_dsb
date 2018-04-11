@@ -65,10 +65,7 @@ def pixelwise_weighted_cross_entropy_loss(y_true, y_pred):
     pred = tf.gather(y_pred, [0], axis=3)
     mask = tf.gather(y_true, [0], axis=3)
     weights = tf.gather(y_true, [1], axis=3)
-
-    pred = tf.Print(pred, ["pred: ", tf.shape(pred), pred])
-    mask = tf.Print(mask, ["mask: ", tf.shape(mask), mask])
-    weights = tf.Print(weights, ["weights: ", tf.shape(weights), weights])
+    #weights = tf.Print(weights, ["weights: ", tf.shape(weights), weights])
 
     loss = tf.losses.sigmoid_cross_entropy(multi_class_labels=mask, logits=pred, weights=weights)
     return loss
@@ -141,13 +138,9 @@ def build_unet(lr, IMG_HEIGHT, IMG_WIDTH, IMG_CHANNELS, use_weights=False):
         padding_layer = Conv2D(1, (1, 1), activation=None) (outputs)
         outputs_padded = concatenate([outputs, padding_layer], axis=3)
         
-        # outputs_print = tf.Print(outputs, ["outputs: ", tf.shape(outputs), outputs])
-        # outputs_padded_print = tf.Print(outputs_padded, ["outputs_padded: ", tf.shape(outputs_padded), outputs_padded])
-
         model = Model(inputs=[inputs], outputs=[outputs_padded])
-        # TODO figure out how to get this metric to work - keras checks input vs output dimensions
         model.compile(optimizer=opt, loss=pixelwise_weighted_cross_entropy_loss) #, metrics=[mean_iou])
-# 	model.compile(optimizer=opt, loss=my_sigmoid_cross_entropy)
+    	# model.compile(optimizer=opt, loss=my_sigmoid_cross_entropy)
 
     # model.summary()
     return model
@@ -168,6 +161,7 @@ def build_data_generators(data_path, batch_size, target_size, use_weights=False,
                                       featurewise_center=normalize, featurewise_std_normalization=normalize)
 
     if normalize: 
+        print('Fitting to normalize data')
         trainGenerator.fit(X_train) # if normalization is on - TODO try this
 
     color_mode = 'rgb' if RGB else 'grayscale'
@@ -197,12 +191,12 @@ if __name__ == "__main__":
     VALIDATION_STEPS = 10
 
     LEARNING_RATE = 1e-4
-    USE_WEIGHTS = False
+    USE_WEIGHTS = True
     NORMALIZE = True
 
     data_path = '../data/dataset_fixed_256x256.npz'
     save_path = 'models/'
-    model_name = 'rgb_normalize_no_bn'
+    model_name = 'rgb_normalize_no_bn_weights'
 
     if not os.path.exists(save_path):
         os.makedirs(save_path)
