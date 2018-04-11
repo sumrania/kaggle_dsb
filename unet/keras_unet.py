@@ -64,9 +64,9 @@ def pixelwise_weighted_cross_entropy_loss(y_true, y_pred):
     mask = tf.gather(y_true, [0], axis=3)
     weights = tf.gather(y_true, [1], axis=3)
 
-#    pred = tf.Print(pred, ["pred: ", tf.shape(pred), pred])
-#    mask = tf.Print(mask, ["mask: ", tf.shape(mask), mask])
-#    weights = tf.Print(weights, ["weights: ", tf.shape(weights), weights])
+    pred = tf.Print(pred, ["pred: ", tf.shape(pred), pred])
+    mask = tf.Print(mask, ["mask: ", tf.shape(mask), mask])
+    weights = tf.Print(weights, ["weights: ", tf.shape(weights), weights])
 
     loss = tf.losses.sigmoid_cross_entropy(multi_class_labels=mask, logits=pred, weights=weights)
     return loss
@@ -139,8 +139,8 @@ def build_unet(lr, IMG_HEIGHT, IMG_WIDTH, IMG_CHANNELS, use_weights=False):
         padding_layer = Conv2D(1, (1, 1), activation=None) (outputs)
         outputs_padded = concatenate([outputs, padding_layer], axis=3)
         
-        # outputs = tf.Print(outputs, ["outputs: ", tf.shape(outputs), outputs])
-        # outputs_padded = tf.Print(outputs_padded, ["outputs_padded: ", tf.shape(outputs_padded), outputs_padded])
+        # outputs_print = tf.Print(outputs, ["outputs: ", tf.shape(outputs), outputs])
+        # outputs_padded_print = tf.Print(outputs_padded, ["outputs_padded: ", tf.shape(outputs_padded), outputs_padded])
 
         model = Model(inputs=[inputs], outputs=[outputs_padded])
         # TODO figure out how to get this metric to work - keras checks input vs output dimensions
@@ -195,7 +195,7 @@ if __name__ == "__main__":
 
     data_path = '../data/dataset_fixed_256x256.npz'
     save_path = 'models/'
-    model_name = 'gray_256_testmylossoneweights'
+    model_name = 'gray_256_testweights'
 
     if not os.path.exists(save_path):
         os.makedirs(save_path)
