@@ -65,9 +65,7 @@ def pixelwise_weighted_cross_entropy_loss(y_true, y_pred):
     pred = tf.gather(y_pred, [0], axis=3)
     mask = tf.gather(y_true, [0], axis=3)
     weights = tf.gather(y_true, [1], axis=3)
-    
-    # y_pred = tf.Print(y_pred, ["y_pred: ", tf.shape(y_pred)])
-    # weights = tf.Print(weights, ["weights: ", tf.shape(weights), weights])
+    #weights = tf.Print(weights, ["weights: ", tf.shape(weights), weights])
 
     loss = tf.losses.sigmoid_cross_entropy(multi_class_labels=mask, logits=pred, weights=weights)
     return loss
@@ -136,13 +134,10 @@ def build_unet(lr, IMG_HEIGHT, IMG_WIDTH, IMG_CHANNELS, use_weights=False):
         outputs = Conv2D(1, (1, 1), activation=None) (c9) # No activation because it's included in loss function
 
         # work-around for keras' output vs label dim checking - pad output with a layer of garbage
-        # Conv2D on padding work-around for "AttributeError: 'Tensor' object has no attribute '_keras_history'"
-        #   all tensors need to be outputs from a keras layer. conv on zeros returns zero
-        padding_layer = tf.zeros_like(outputs)
-        padding_layer = Conv2D(1, (1, 1), activation=None) (outputs) 
-        outputs_padded = Lambda(lambda x: K.concatenate([outputs, padding_layer], axis=3))([outputs, padding_layer])
-        # outputs_padded = K.concatenate([outputs, padding_layer], axis=3)
-
+        # padding_layer = tf.zeros_like(outputs)
+        padding_layer = Conv2D(1, (1, 1), activation=None) (outputs)
+        outputs_padded = concatenate([outputs, padding_layer], axis=3)
+        
         model = Model(inputs=[inputs], outputs=[outputs_padded])
         model.compile(optimizer=opt, loss=pixelwise_weighted_cross_entropy_loss) #, metrics=[mean_iou])
     	# model.compile(optimizer=opt, loss=my_sigmoid_cross_entropy)
