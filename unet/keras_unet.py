@@ -1,5 +1,7 @@
 # source activate tensorflow_p27
 # pip install scikit-image opencv-python keras
+# git clone https://github.com/sumrania/kaggle_dsb.git
+# aws-scp [filename] ubuntu@$[awsdns]:/home/ubuntu/kaggle_dsb/unet/data/
 
 import os, sys, warnings, random
 import numpy as np
