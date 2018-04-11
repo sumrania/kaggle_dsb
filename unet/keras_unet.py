@@ -137,7 +137,7 @@ def build_unet(lr, IMG_HEIGHT, IMG_WIDTH, IMG_CHANNELS, use_weights=False):
         # padding_layer = tf.zeros_like(outputs)
         padding_layer = Conv2D(1, (1, 1), activation=None) (outputs)
         outputs_padded = concatenate([outputs, padding_layer], axis=3)
-        
+
         model = Model(inputs=[inputs], outputs=[outputs_padded])
         model.compile(optimizer=opt, loss=pixelwise_weighted_cross_entropy_loss) #, metrics=[mean_iou])
     	# model.compile(optimizer=opt, loss=my_sigmoid_cross_entropy)
