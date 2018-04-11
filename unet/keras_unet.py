@@ -138,8 +138,8 @@ def build_unet(lr, IMG_HEIGHT, IMG_WIDTH, IMG_CHANNELS, use_weights=False):
         padding_layer = tf.zeros_like(outputs)
         outputs_padded = concatenate([outputs, padding_layer], axis=3)
         
-        outputs = tf.Print(outputs, ["outputs: ", tf.shape(outputs), outputs])
-        outputs_padded = tf.Print(outputs_padded, ["outputs_padded: ", tf.shape(outputs_padded), outputs_padded])
+        # outputs = tf.Print(outputs, ["outputs: ", tf.shape(outputs), outputs])
+        # outputs_padded = tf.Print(outputs_padded, ["outputs_padded: ", tf.shape(outputs_padded), outputs_padded])
 
         model = Model(inputs=[inputs], outputs=[outputs_padded])
         # TODO figure out how to get this metric to work - keras checks input vs output dimensions
