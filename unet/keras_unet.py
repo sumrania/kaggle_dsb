@@ -187,7 +187,7 @@ if __name__ == "__main__":
     # Should image be larger? What's the range of image sizes in dataset (see exploration kernels)
     IMG_HEIGHT = 256
     IMG_WIDTH = 256
-    RGB = True
+    RGB = False
     IMG_CHANNELS = 3 if RGB else 1
 
     EPOCHS = 30
@@ -201,7 +201,7 @@ if __name__ == "__main__":
 
     data_path = '../data/dataset_fixed_256x256.npz'
     save_path = 'models/'
-    model_name = 'rgb_normalize_no_bn_weights'
+    model_name = 'gray_normalize_no_bn_weights'
 
     if not os.path.exists(save_path):
         os.makedirs(save_path)
@@ -225,6 +225,14 @@ if __name__ == "__main__":
 
     if NORMALIZE:
         X_train, _, _, _, _ = load_saved_data(data_path, image_size=(IMG_HEIGHT, IMG_WIDTH))
+
+        # RGB to gray, if needed
+        if not RGB:
+            X_train_gray = np.zeros((X_train.shape[0], X_train.shape[1], X_train.shape[2], 1))
+            for i in range(X_train.shape[0]):
+                X_train_gray[i,:,:,:] = rgb2gray(X_train[i,:,:,:])
+            X_train = X_train_gray
+
     else:
         X_train = None
 
