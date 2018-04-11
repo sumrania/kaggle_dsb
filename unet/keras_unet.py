@@ -125,13 +125,13 @@ def build_unet(lr, IMG_HEIGHT, IMG_WIDTH, IMG_CHANNELS, use_weights=False):
     opt = optimizers.Adam(lr=lr, decay=0.0) # TODO use this
 
     if not use_weights: # Standard U-net model
-        # outputs = Conv2D(1, (1, 1), activation='sigmoid') (c9)
-        # model = Model(inputs=[inputs], outputs=[outputs])
-        # model.compile(optimizer=opt, loss='binary_crossentropy', metrics=[mean_iou])
-
-        outputs = Conv2D(1, (1, 1), activation=None) (c9)
+        outputs = Conv2D(1, (1, 1), activation='sigmoid') (c9)
         model = Model(inputs=[inputs], outputs=[outputs])
-        model.compile(optimizer=opt, loss=my_sigmoid_cross_entropy, metrics=[mean_iou])
+        model.compile(optimizer=opt, loss='binary_crossentropy', metrics=[mean_iou])
+
+        # outputs = Conv2D(1, (1, 1), activation=None) (c9)
+        # model = Model(inputs=[inputs], outputs=[outputs])
+        # model.compile(optimizer=opt, loss=my_sigmoid_cross_entropy, metrics=[mean_iou])
 
     else: # U-net with pixelwise weights on loss
         outputs = Conv2D(1, (1, 1), activation=None) (c9) # No activation because it's included in loss function
