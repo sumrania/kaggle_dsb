@@ -64,9 +64,9 @@ def pixelwise_weighted_cross_entropy_loss(y_true, y_pred):
     mask = tf.gather(y_true, [0], axis=3)
     weights = tf.gather(y_true, [1], axis=3)
 
-    pred = tf.Print(pred, ["pred: ", tf.shape(pred), pred])
-    mask = tf.Print(mask, ["mask: ", tf.shape(mask), mask])
-    weights = tf.Print(weights, ["weights: ", tf.shape(weights), weights])
+#    pred = tf.Print(pred, ["pred: ", tf.shape(pred), pred])
+#    mask = tf.Print(mask, ["mask: ", tf.shape(mask), mask])
+#    weights = tf.Print(weights, ["weights: ", tf.shape(weights), weights])
 
     loss = tf.losses.sigmoid_cross_entropy(multi_class_labels=mask, logits=pred, weights=weights)
     return loss
@@ -135,7 +135,8 @@ def build_unet(lr, IMG_HEIGHT, IMG_WIDTH, IMG_CHANNELS, use_weights=False):
         outputs = Conv2D(1, (1, 1), activation=None) (c9) # No activation because it's included in loss function
 
         # work-around for keras' output vs label dim checking - pad output with a layer of garbage
-        padding_layer = tf.zeros_like(outputs)
+        # padding_layer = tf.zeros_like(outputs)
+        padding_layer = Conv2D(1, (1, 1), activation=None) (outputs)
         outputs_padded = concatenate([outputs, padding_layer], axis=3)
         
         # outputs = tf.Print(outputs, ["outputs: ", tf.shape(outputs), outputs])
@@ -143,8 +144,8 @@ def build_unet(lr, IMG_HEIGHT, IMG_WIDTH, IMG_CHANNELS, use_weights=False):
 
         model = Model(inputs=[inputs], outputs=[outputs_padded])
         # TODO figure out how to get this metric to work - keras checks input vs output dimensions
-        #model.compile(optimizer=opt, loss=pixelwise_weighted_cross_entropy_loss) #, metrics=[mean_iou])
-	model.compile(optimizer=opt, loss=my_sigmoid_cross_entropy)
+        model.compile(optimizer=opt, loss=pixelwise_weighted_cross_entropy_loss) #, metrics=[mean_iou])
+# 	model.compile(optimizer=opt, loss=my_sigmoid_cross_entropy)
 
     # model.summary()
     return model
@@ -194,7 +195,7 @@ if __name__ == "__main__":
 
     data_path = '../data/dataset_fixed_256x256.npz'
     save_path = 'models/'
-    model_name = 'gray_256_testmylosspadding'
+    model_name = 'gray_256_testmylossoneweights'
 
     if not os.path.exists(save_path):
         os.makedirs(save_path)
