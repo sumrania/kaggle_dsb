@@ -53,7 +53,9 @@ def jaccard_dice_coeff_loss(y_true, y_pred):
 
 # remove sigmoid activation on last layer if using this
 def my_sigmoid_cross_entropy(y_true, y_pred):
-    loss = tf.losses.sigmoid_cross_entropy(multi_class_labels=y_true, logits=y_pred)
+    pred = tf.gather(y_pred, [0], axis=3)
+    mask = tf.gather(y_true, [0], axis=3)
+    loss = tf.losses.sigmoid_cross_entropy(multi_class_labels=mask, logits=pred)
     return loss
 
 # remove sigmoid activation on last layer if using this
@@ -141,7 +143,8 @@ def build_unet(lr, IMG_HEIGHT, IMG_WIDTH, IMG_CHANNELS, use_weights=False):
 
         model = Model(inputs=[inputs], outputs=[outputs_padded])
         # TODO figure out how to get this metric to work - keras checks input vs output dimensions
-        model.compile(optimizer=opt, loss=pixelwise_weighted_cross_entropy_loss) #, metrics=[mean_iou])
+        #model.compile(optimizer=opt, loss=pixelwise_weighted_cross_entropy_loss) #, metrics=[mean_iou])
+	model.compile(optimizer=opt, loss=my_sigmoid_cross_entropy)
 
     # model.summary()
     return model
@@ -187,13 +190,13 @@ if __name__ == "__main__":
     VALIDATION_STEPS = 10
 
     LEARNING_RATE = 1e-4
-    USE_WEIGHTS = False
+    USE_WEIGHTS = True
 
     data_path = '../data/dataset_fixed_256x256.npz'
     save_path = 'models/'
-    model_name = 'gray_256_testmyloss'
+    model_name = 'gray_256_testmylosspadding'
 
-    if not os.path.exists(save_path): 
+    if not os.path.exists(save_path):
         os.makedirs(save_path)
 
     print(model_name)
