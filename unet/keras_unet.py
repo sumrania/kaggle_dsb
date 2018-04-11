@@ -77,7 +77,7 @@ def ConvBlock(inputs, num_kernels, kernel_shape=(3,3), p_dropout=0.1):
     conv = Conv2D(num_kernels, kernel_shape, activation='elu', kernel_initializer='he_normal', padding='same') (inputs)
     conv = Dropout(p_dropout) (conv)
     conv = Conv2D(num_kernels, kernel_shape, activation='elu', kernel_initializer='he_normal', padding='same') (conv)
-    conv = BatchNormalization() (conv)
+    # conv = BatchNormalization() (conv)
     return conv
 
 def build_unet(lr, IMG_HEIGHT, IMG_WIDTH, IMG_CHANNELS, use_weights=False):
@@ -188,7 +188,7 @@ if __name__ == "__main__":
     # Should image be larger? What's the range of image sizes in dataset (see exploration kernels)
     IMG_HEIGHT = 256
     IMG_WIDTH = 256
-    RGB = False
+    RGB = True
     IMG_CHANNELS = 3 if RGB else 1
 
     EPOCHS = 30
@@ -197,12 +197,12 @@ if __name__ == "__main__":
     VALIDATION_STEPS = 10
 
     LEARNING_RATE = 1e-4
-    USE_WEIGHTS = True
-    NORMALIZE = False
+    USE_WEIGHTS = False
+    NORMALIZE = True
 
     data_path = '../data/dataset_fixed_256x256.npz'
     save_path = 'models/'
-    model_name = 'gray_256_testweights'
+    model_name = 'rgb_normalize_no_bn'
 
     if not os.path.exists(save_path):
         os.makedirs(save_path)
