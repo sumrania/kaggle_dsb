@@ -52,6 +52,11 @@ def jaccard_dice_coeff_loss(y_true, y_pred):
     return loss
 
 # remove sigmoid activation on last layer if using this
+def my_sigmoid_cross_entropy(y_true, y_pred):
+    loss = tf.losses.sigmoid_cross_entropy(multi_class_labels=y_true, logits=y_pred)
+    return loss
+
+# remove sigmoid activation on last layer if using this
 def pixelwise_weighted_cross_entropy_loss(y_true, y_pred):
     pred = tf.gather(y_pred, [0], axis=3)
     mask = tf.gather(y_true, [0], axis=3)
@@ -116,9 +121,13 @@ def build_unet(lr, IMG_HEIGHT, IMG_WIDTH, IMG_CHANNELS, use_weights=False):
     opt = optimizers.Adam(lr=lr, decay=0.0) # TODO use this
 
     if not use_weights: # Standard U-net model
-        outputs = Conv2D(1, (1, 1), activation='sigmoid') (c9)
+        # outputs = Conv2D(1, (1, 1), activation='sigmoid') (c9)
+        # model = Model(inputs=[inputs], outputs=[outputs])
+        # model.compile(optimizer=opt, loss='binary_crossentropy', metrics=[mean_iou])
+
+        outputs = Conv2D(1, (1, 1), activation=None) (c9)
         model = Model(inputs=[inputs], outputs=[outputs])
-        model.compile(optimizer=opt, loss='binary_crossentropy', metrics=[mean_iou])
+        model.compile(optimizer=opt, loss=my_sigmoid_cross_entropy, metrics=[mean_iou])
 
     else: # U-net with pixelwise weights on loss
         outputs = Conv2D(1, (1, 1), activation=None) (c9) # No activation because it's included in loss function
@@ -169,7 +178,7 @@ if __name__ == "__main__":
     # Should image be larger? What's the range of image sizes in dataset (see exploration kernels)
     IMG_HEIGHT = 256
     IMG_WIDTH = 256
-    RGB = True
+    RGB = False
     IMG_CHANNELS = 3 if RGB else 1
 
     EPOCHS = 30
@@ -178,11 +187,11 @@ if __name__ == "__main__":
     VALIDATION_STEPS = 10
 
     LEARNING_RATE = 1e-4
-    USE_WEIGHTS = True
+    USE_WEIGHTS = False
 
     data_path = '../data/dataset_fixed_256x256.npz'
     save_path = 'models/'
-    model_name = 'rgb_batchnorm_fixed_256_weights'
+    model_name = 'gray_256_testmyloss'
 
     if not os.path.exists(save_path): 
         os.makedirs(save_path)
@@ -220,7 +229,7 @@ if __name__ == "__main__":
     cyclic_lr = CyclicLR(base_lr=1e-4, max_lr=1e-3, step_size=2*STEPS_PER_EPOCH,
                          mode='triangular')
     tensorboard = TensorBoard(log_dir='/tmp/unet')
-    plateau = ReduceLROnPlateau(monitor='val_loss', factor=0.5, patience=3, verbose=1)
+    plateau = ReduceLROnPlateau(monitor='val_loss', factor=0.2, patience=3, verbose=1)
 
     callbacks = [checkpoint, earlystopper, plateau, tensorboard]
     print('Callbacks: ', callbacks)
