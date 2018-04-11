@@ -140,7 +140,13 @@ def build_unet(lr, IMG_HEIGHT, IMG_WIDTH, IMG_CHANNELS, use_weights=False):
         #   all tensors need to be outputs from a keras layer. conv on zeros returns zero
         padding_layer = tf.zeros_like(outputs)
         padding_layer = Conv2D(1, (1, 1), activation=None) (outputs) 
-        outputs_padded = Lambda(lambda x: K.concatenate([outputs, padding_layer], axis=3))([outputs, padding_layer])
+
+        def k_concat(outputs, padding_layer):
+            K.concatenate([outputs, padding_layer], axis=3)
+
+        outputs_padded = Lambda(k_concat)(outputs, padding_layer)
+
+        # outputs_padded = Lambda(lambda x: K.concatenate([outputs, padding_layer], axis=3))([outputs, padding_layer])
         # outputs_padded = K.concatenate([outputs, padding_layer], axis=3)
 
         model = Model(inputs=[inputs], outputs=[outputs_padded])
@@ -232,7 +238,6 @@ if __name__ == "__main__":
             for i in range(X_train.shape[0]):
                 X_train_gray[i,:,:,:] = rgb2gray(X_train[i,:,:,:])
             X_train = X_train_gray
-
     else:
         X_train = None
 
