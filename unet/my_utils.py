@@ -6,7 +6,7 @@ import keras.backend as K
 
 # Note: this assumes that dataset is already solved to npz (by data_preprocessing notebook)
 def load_saved_data(data_path, image_size=(256, 256)):
-    print('Reading from previously loaded data.')
+    print('Reading dataset from previously processed npz file.')
     npzfile = np.load(data_path)
     return npzfile['X_train'], npzfile['Y_train'], npzfile['C_train'], npzfile['W_train'], npzfile['X_test']    
 

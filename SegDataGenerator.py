@@ -1184,7 +1184,7 @@ class DirectoryIterator(Iterator):
             self.images = npzfile['X_test']
             self.samples = len(self.images)
         
-        if self.label_bw == True:
+        if self.subset != 'testing' and self.label_bw == True:
             labels_new = np.zeros(self.labels.shape)
             idx = self.labels > 128
             labels_new[idx] = 255
@@ -1216,11 +1216,12 @@ class DirectoryIterator(Iterator):
                 img = self.images[j]
                 if grayscale == True and img.shape[2] != 1:
                     img = rgb2gray(img)
-                x = self.image_data_generator.random_transform(x)
+                x = self.image_data_generator.random_transform(img)
                 if grayscale == True:
                     img = np.reshape(x[:,:,0], (h, w, 1))
                 else:
                     img = x[:,:,0:3]
+                img = img * 1.0
                 img = self.image_data_generator.standardize(img)
                 batch_x[i] = img
             return batch_x
